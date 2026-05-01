@@ -15,29 +15,40 @@ for _, name in ipairs(peripheral.getNames()) do
 end
 
 local itemCounts = {}
-local itemData = {}  -- stores {parsedName, fullName, chestIndex, slots}
-for chestIdx, chest in ipairs(chests) do
-    local items = chest.list()
-    if items then
-        for slot, item in pairs(items) do
-            local parsedName = item.name:match(":(.+)$") or item.name
-            itemCounts[parsedName] = (itemCounts[parsedName] or 0) + item.count
-            
-            if not itemData[parsedName] then
-                itemData[parsedName] = {fullName = item.name, locations = {}}
+local itemData = {}
+local itemList = {}
+local scrollOffset = 0
+local maxScroll = 0
+
+local function scanChests()
+    itemCounts = {}
+    itemData = {}
+    itemList = {}
+
+    for chestIdx, chest in ipairs(chests) do
+        local items = chest.list()
+        if items then
+            for slot, item in pairs(items) do
+                local parsedName = item.name:match(":(.+)$") or item.name
+                itemCounts[parsedName] = (itemCounts[parsedName] or 0) + item.count
+
+                if not itemData[parsedName] then
+                    itemData[parsedName] = {fullName = item.name, locations = {}}
+                end
+                table.insert(itemData[parsedName].locations, {chest = chest, chestIdx = chestIdx, slot = slot, count = item.count})
             end
-            table.insert(itemData[parsedName].locations, {chest = chest, chestIdx = chestIdx, slot = slot, count = item.count})
         end
     end
+
+    for name, count in pairs(itemCounts) do
+        table.insert(itemList, string.format("%-4dx: %s", count, name))
+    end
+
+    scrollOffset = 0
+    maxScroll = math.max(0, #itemList - (h - 1))
 end
 
-local itemList = {}
-for name, count in pairs(itemCounts) do
-    table.insert(itemList, string.format("%-4dx: %s", count, name))
-end
-
-local scrollOffset = 0
-local maxScroll = math.max(0, #itemList - (h - 1))
+scanChests()
 local cmdInput = ""
 
 
@@ -71,8 +82,10 @@ local function showHelp()
     term.setCursorPos(1, 4)
     term.write("  pull <item> <amount> - Pull items")
     term.setCursorPos(1, 5)
-    term.write("")
+    term.write("  refresh - Rescan all chests")
     term.setCursorPos(1, 6)
+    term.write("")
+    term.setCursorPos(1, 7)
     term.write("Press any key to return...")
     term.redirect(term.native())
     os.pullEvent("key")
@@ -123,6 +136,15 @@ local function handleCommand(cmd)
         return false  -- exit
     elseif cmd == "help" then
         showHelp()
+        return true
+    elseif cmd == "refresh" then
+        scanChests()
+        term.redirect(cmdWin)
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.write("Refreshed! " .. #itemList .. " items found")
+        term.redirect(term.native())
+        sleep(1)
         return true
     elseif cmd:match("^pull ") then
         local itemName, amountStr = cmd:match("^pull (%S+) (%d+)$")
