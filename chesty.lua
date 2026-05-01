@@ -145,6 +145,7 @@ local function showHelp()
         "  find <item> - Filter list by name",
         "  list - Show full list",
         "  chests - List network chests",
+        "  perf - List all peripherals",
         "  output - Pick output chest",
         "  how - Setup tutorial",
         "",
@@ -247,6 +248,71 @@ local function chooseOutputChest()
     end
 end
 
+-- List ALL peripherals (direct + network), scrollable, * marks output
+local function listPeripherals()
+    local all = {}
+    local seen = {}
+
+    for _, name in ipairs(peripheral.getNames()) do
+        if not seen[name] then
+            seen[name] = true
+            table.insert(all, {name = name, ptype = peripheral.getType(name)})
+        end
+    end
+
+    if modem then
+        for _, name in ipairs(modem.getNamesRemote()) do
+            if not seen[name] then
+                seen[name] = true
+                table.insert(all, {name = name, ptype = peripheral.getType(name) or modem.getTypeRemote(name)})
+            end
+        end
+    end
+
+    table.sort(all, function(a, b) return a.name < b.name end)
+
+    if #all == 0 then
+        status("No peripherals found!", 2)
+        return
+    end
+
+    local perfOffset = 0
+    local perfMax = math.max(0, #all - (h - 2))
+
+    local function drawPerf()
+        term.redirect(mainWin)
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.write(string.format("All peripherals (%d)  (* = output)", #all))
+        for y = 2, h - 1 do
+            local idx = y - 1 + perfOffset
+            local entry = all[idx]
+            term.setCursorPos(1, y)
+            if entry then
+                local marker = (entry.name == outputChestName) and "*" or " "
+                term.write(string.format("%s %s [%s]", marker, entry.name, entry.ptype or "?"))
+            end
+        end
+        term.redirect(cmdWin)
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.write("Scroll or press any key to return...")
+        term.redirect(term.native())
+    end
+
+    drawPerf()
+
+    while true do
+        local event, p1 = os.pullEvent()
+        if event == "mouse_scroll" then
+            perfOffset = math.max(0, math.min(perfOffset + p1, perfMax))
+            drawPerf()
+        elseif event == "key" then
+            return
+        end
+    end
+end
+
 -- Just list networked chests for inspection
 local function listNetworkChests()
     if not modem then
@@ -339,6 +405,8 @@ local function handleCommand(cmd)
         status("Refreshed! " .. #itemList .. " items found")
     elseif cmd == "chests" then
         listNetworkChests()
+    elseif cmd == "perf" then
+        listPeripherals()
     elseif cmd == "output" then
         chooseOutputChest()
     elseif cmd:match("^sort ") then
