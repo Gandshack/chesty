@@ -122,7 +122,8 @@ local function pullItem(itemName, amount)
         return
     end
     
-    if not outputChest then
+    local currentOutput = peripheral.isPresent("top") and peripheral.wrap("top") or nil
+    if not currentOutput then
         term.redirect(cmdWin)
         term.clear()
         term.setCursorPos(1, 1)
