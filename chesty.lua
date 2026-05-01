@@ -4,8 +4,16 @@ local w, h = term.getSize()
 local mainWin = window.create(term.current(), 1, 1, w, h - 1)
 local cmdWin = window.create(term.current(), 1, h, w, 1)
 
-local chests = {peripheral.find("inventory")}
 local outputChest = peripheral.wrap("top")
+local allChests = {peripheral.find("inventory")}
+local chests = {}
+
+-- Exclude output chest from storage chests
+for _, chest in ipairs(allChests) do
+    if chest ~= outputChest then
+        table.insert(chests, chest)
+    end
+end
 
 local itemCounts = {}
 local itemData = {}  -- stores {parsedName, fullName, chestIndex, slots}
