@@ -11,6 +11,7 @@ end
 local scrollOffset = 0
 local maxScroll = math.max(0, #itemList - h)
 
+
 local function draw()
     term.clear()
     for y = 1, h do
@@ -25,7 +26,7 @@ end
 draw()
 
 while true do
-    local event, _, _, delta = os.pullEvent("mouse_scroll")
+    local event, delta = os.pullEvent("mouse_scroll")
     scrollOffset = math.max(0, math.min(scrollOffset + delta, maxScroll))
     draw()
 end
