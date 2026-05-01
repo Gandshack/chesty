@@ -22,6 +22,7 @@ end
 
 local scrollOffset = 0
 local maxScroll = math.max(0, #itemList - (h - 1))
+local cmdInput = ""
 
 
 local function draw()
@@ -38,15 +39,50 @@ local function draw()
     term.redirect(cmdWin)
     term.clear()
     term.setCursorPos(1, 1)
-    term.write("Items: " .. #itemList .. " | Scroll to navigate")
-    
+    term.write(">" .. cmdInput)
     term.redirect(term.native())
+end
+
+local function handleCommand(cmd)
+    if cmd == "q" or cmd == "quit" then
+        term.clear()
+        term.setCursorPos(1, 1)
+        return false  -- exit
+    elseif cmd == "help" then
+        term.redirect(cmdWin)
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.write("q=quit, help=this")
+        term.redirect(term.native())
+        sleep(2)
+        return true
+    end
+    return true  -- continue
 end
 
 draw()
 
 while true do
-    local event, delta = os.pullEvent("mouse_scroll")
-    scrollOffset = math.max(0, math.min(scrollOffset + delta, maxScroll))
-    draw()
+    local event, param1 = os.pullEvent()
+    
+    if event == "mouse_scroll" then
+        scrollOffset = math.max(0, math.min(scrollOffset + param1, maxScroll))
+        draw()
+        
+    elseif event == "char" then
+        cmdInput = cmdInput .. param1
+        draw()
+        
+    elseif event == "key" then
+        if param1 == keys.enter then
+            if not handleCommand(cmdInput) then
+                break
+            end
+            cmdInput = ""
+            draw()
+        elseif param1 == keys.backspace then
+            cmdInput = cmdInput:sub(1, -2)
+            draw()
+        end
+    end
 end
