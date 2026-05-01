@@ -19,6 +19,7 @@ local itemData = {}
 local itemList = {}
 local scrollOffset = 0
 local maxScroll = 0
+local sortMode = "name"  -- "name" or "count"
 
 local function scanChests()
     itemCounts = {}
@@ -41,7 +42,17 @@ local function scanChests()
     end
 
     for name, count in pairs(itemCounts) do
-        table.insert(itemList, string.format("%-4dx: %s", count, name))
+        table.insert(itemList, {name = name, count = count})
+    end
+
+    if sortMode == "name" then
+        table.sort(itemList, function(a, b) return a.name < b.name end)
+    else
+        table.sort(itemList, function(a, b) return a.count > b.count end)
+    end
+
+    for i, entry in ipairs(itemList) do
+        itemList[i] = string.format("%-4dx: %s", entry.count, entry.name)
     end
 
     scrollOffset = 0
@@ -84,8 +95,10 @@ local function showHelp()
     term.setCursorPos(1, 5)
     term.write("  refresh - Rescan all chests")
     term.setCursorPos(1, 6)
-    term.write("")
+    term.write("  sort name|count - Sort the list")
     term.setCursorPos(1, 7)
+    term.write("")
+    term.setCursorPos(1, 8)
     term.write("Press any key to return...")
     term.redirect(term.native())
     os.pullEvent("key")
@@ -145,6 +158,26 @@ local function handleCommand(cmd)
         term.write("Refreshed! " .. #itemList .. " items found")
         term.redirect(term.native())
         sleep(1)
+        return true
+    elseif cmd:match("^sort ") then
+        local mode = cmd:match("^sort (%S+)$")
+        if mode == "name" or mode == "count" then
+            sortMode = mode
+            scanChests()
+            term.redirect(cmdWin)
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.write("Sorted by " .. mode)
+            term.redirect(term.native())
+            sleep(1)
+        else
+            term.redirect(cmdWin)
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.write("Usage: sort name|count")
+            term.redirect(term.native())
+            sleep(1)
+        end
         return true
     elseif cmd:match("^pull ") then
         local itemName, amountStr = cmd:match("^pull (%S+) (%d+)$")
