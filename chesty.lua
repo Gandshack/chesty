@@ -4,12 +4,12 @@ local w, h = term.getSize()
 local mainWin = window.create(term.current(), 1, 1, w, h - 1)
 local cmdWin = window.create(term.current(), 1, h, w, 1)
 
-local outputChest = peripheral.wrap("top")
+local outputChest = peripheral.isPresent("top") and peripheral.wrap("top") or nil
 local chests = {}
 
 -- Find all inventory peripherals except "top"
 for _, name in ipairs(peripheral.getNames()) do
-    if peripheral.getType(name) == "inventory" and name ~= "top" then
+    if name ~= "top" and peripheral.hasType(name, "inventory") then
         table.insert(chests, peripheral.wrap(name))
     end
 end
