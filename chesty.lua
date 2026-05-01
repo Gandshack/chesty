@@ -4,13 +4,34 @@ local w, h = term.getSize()
 local mainWin = window.create(term.current(), 1, 1, w, h - 1)
 local cmdWin = window.create(term.current(), 1, h, w, 1)
 
-local outputChest = peripheral.isPresent("top") and peripheral.wrap("top") or nil
+-- Find wired modem to distinguish networked vs local peripherals
+local modem
+for _, name in ipairs(peripheral.getNames()) do
+    if peripheral.getType(name) == "modem" and not peripheral.call(name, "isWireless") then
+        modem = peripheral.wrap(name)
+        break
+    end
+end
+
+local networkedNames = {}
+if modem then
+    for _, name in ipairs(modem.getNamesRemote()) do
+        networkedNames[name] = true
+    end
+end
+
+local outputChest = nil
+local outputChestName = nil
 local chests = {}
 
--- Find all inventory peripherals except "top"
 for _, name in ipairs(peripheral.getNames()) do
-    if name ~= "top" and peripheral.hasType(name, "inventory") then
-        table.insert(chests, peripheral.wrap(name))
+    if peripheral.hasType(name, "inventory") then
+        if networkedNames[name] then
+            table.insert(chests, peripheral.wrap(name))
+        else
+            outputChest = peripheral.wrap(name)
+            outputChestName = name
+        end
     end
 end
 
@@ -122,23 +143,21 @@ local function pullItem(itemName, amount)
         return
     end
     
-    local currentOutput = peripheral.isPresent("top") and peripheral.wrap("top") or nil
-    if not currentOutput then
+    if not outputChest then
         term.redirect(cmdWin)
         term.clear()
         term.setCursorPos(1, 1)
-        term.write("No chest on top!")
+        term.write("No output chest found!")
         term.redirect(term.native())
         sleep(1)
         return
     end
-    
-    local outputName = peripheral.getName(currentOutput)
+
     local remaining = amount
     for _, loc in ipairs(data.locations) do
         if remaining <= 0 then break end
         local toMove = math.min(remaining, loc.count)
-        loc.chest.pushItems(outputName, loc.slot, toMove)
+        loc.chest.pushItems(outputChestName, loc.slot, toMove)
         remaining = remaining - toMove
     end
     
