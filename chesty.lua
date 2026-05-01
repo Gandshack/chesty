@@ -410,24 +410,11 @@ end
 draw()
 
 while true do
-    local event, param1, param2, param3 = os.pullEvent()
+    local event, param1 = os.pullEvent()
 
     if event == "mouse_scroll" then
         scrollOffset = math.max(0, math.min(scrollOffset + param1, maxScroll))
         draw()
-    elseif event == "mouse_click" then
-        local clickY = param3
-        if clickY < h then
-            local idx = clickY + scrollOffset
-            local entry = itemList[idx]
-            if entry then
-                local name = entry:match("^%s*%d+x: (.+)$")
-                if name then
-                    cmdInput = "pull " .. name .. " "
-                    draw()
-                end
-            end
-        end
     elseif event == "char" then
         cmdInput = cmdInput .. param1
         draw()
