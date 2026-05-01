@@ -1,7 +1,7 @@
 {
   "name": "chesty",
   "description": "An Inventory Management System for CC: Tweaked",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "installPath": "/bin",
   "files": ["chesty.lua"]
 }

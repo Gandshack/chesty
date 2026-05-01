@@ -139,6 +139,7 @@ local function showHelp()
         "  q, quit - Exit program",
         "  help - Show this help",
         "  pull <item> <amount> - Pull items",
+        "  push - Push all output items back",
         "  refresh - Rescan all chests",
         "  sort name|count - Sort the list",
         "  find <item> - Filter list by name",
@@ -300,6 +301,31 @@ local function pullItem(itemName, amount)
     status("Pulled " .. (amount - remaining) .. "x " .. itemName)
 end
 
+local function pushAll()
+    if not outputChest then
+        status("No output chest set! Use 'output' command", 2)
+        return
+    end
+
+    local items = outputChest.list()
+    if not items then
+        status("Output chest is empty or unavailable")
+        return
+    end
+
+    local total = 0
+    for slot, item in pairs(items) do
+        for _, chest in ipairs(chests) do
+            local moved = outputChest.pushItems(peripheral.getName(chest), slot)
+            total = total + moved
+            if moved >= item.count then break end
+        end
+    end
+
+    scanChests()
+    status("Pushed " .. total .. " items to storage")
+end
+
 local function handleCommand(cmd)
     if cmd == "q" or cmd == "quit" then
         term.clear()
@@ -370,6 +396,8 @@ local function handleCommand(cmd)
         else
             status("Usage: pull <item> <amount>")
         end
+    elseif cmd == "push" then
+        pushAll()
     end
     return true
 end
