@@ -6,7 +6,7 @@ local items = chest.list()
 local itemList = {}
 for slot, item in pairs(items) do
     local name = item.name:match(":(.+)$") or item.name
-    table.insert(itemList, string.format("%4dx: %s", item.count, name))
+    table.insert(itemList, string.format("%-4dx: %s", item.count, name))
 end
 
 local scrollOffset = 0
