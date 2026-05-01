@@ -4,7 +4,9 @@ local w, h = term.getSize()
 local mainWin = window.create(term.current(), 1, 1, w, h - 1)
 local cmdWin = window.create(term.current(), 1, h, w, 1)
 
--- Find wired modem to distinguish networked vs local peripherals
+local CONFIG_FILE = "output.cfg"
+
+-- Find wired modem
 local modem
 for _, name in ipairs(peripheral.getNames()) do
     if peripheral.getType(name) == "modem" and not peripheral.call(name, "isWireless") then
@@ -13,34 +15,53 @@ for _, name in ipairs(peripheral.getNames()) do
     end
 end
 
-local networkedNames = {}
-if modem then
-    for _, name in ipairs(modem.getNamesRemote()) do
-        networkedNames[name] = true
+-- Load saved output chest name from disk, if it exists
+local function loadOutputName()
+    if fs.exists(CONFIG_FILE) then
+        local f = fs.open(CONFIG_FILE, "r")
+        local name = f.readAll()
+        f.close()
+        return name
     end
+    return nil
 end
 
+local function saveOutputName(name)
+    local f = fs.open(CONFIG_FILE, "w")
+    f.write(name)
+    f.close()
+end
+
+local outputChestName = loadOutputName()
 local outputChest = nil
-local outputChestName = nil
 local chests = {}
 
-for _, name in ipairs(peripheral.getNames()) do
-    if peripheral.hasType(name, "inventory") then
-        if networkedNames[name] then
-            table.insert(chests, peripheral.wrap(name))
-        else
-            outputChest = peripheral.wrap(name)
-            outputChestName = name
+-- Build the list of storage chests, excluding the output
+local function rebuildChestList()
+    chests = {}
+    outputChest = nil
+
+    if not modem then return end
+
+    for _, name in ipairs(modem.getNamesRemote()) do
+        if peripheral.hasType(name, "inventory") then
+            if name == outputChestName then
+                outputChest = peripheral.wrap(name)
+            else
+                table.insert(chests, peripheral.wrap(name))
+            end
         end
     end
 end
+
+rebuildChestList()
 
 local itemCounts = {}
 local itemData = {}
 local itemList = {}
 local scrollOffset = 0
 local maxScroll = 0
-local sortMode = "name"  -- "name" or "count"
+local sortMode = "name"
 
 local function scanChests()
     itemCounts = {}
@@ -83,7 +104,6 @@ end
 scanChests()
 local cmdInput = ""
 
-
 local function draw()
     term.redirect(mainWin)
     term.clear()
@@ -94,7 +114,7 @@ local function draw()
             term.write(item)
         end
     end
-    
+
     term.redirect(cmdWin)
     term.clear()
     term.setCursorPos(1, 1)
@@ -102,31 +122,157 @@ local function draw()
     term.redirect(term.native())
 end
 
+local function status(msg, duration)
+    term.redirect(cmdWin)
+    term.clear()
+    term.setCursorPos(1, 1)
+    term.write(msg)
+    term.redirect(term.native())
+    sleep(duration or 1)
+end
+
 local function showHelp()
     term.redirect(mainWin)
     term.clear()
+    local lines = {
+        "Commands:",
+        "  q, quit - Exit program",
+        "  help - Show this help",
+        "  pull <item> <amount> - Pull items",
+        "  refresh - Rescan all chests",
+        "  sort name|count - Sort the list",
+        "  find <item> - Filter list by name",
+        "  list - Show full list",
+        "  chests - List network chests",
+        "  output - Pick output chest",
+        "  how - Setup tutorial",
+        "",
+        "Press any key to return...",
+    }
+    for i, line in ipairs(lines) do
+        term.setCursorPos(1, i)
+        term.write(line)
+    end
+    term.redirect(term.native())
+    os.pullEvent("key")
+end
+
+-- List all networked chests with numbers, let user pick one to be the output
+local function chooseOutputChest()
+    if not modem then
+        status("No wired modem found!", 2)
+        return
+    end
+
+    local allChests = {}
+    for _, name in ipairs(modem.getNamesRemote()) do
+        if peripheral.hasType(name, "inventory") then
+            table.insert(allChests, name)
+        end
+    end
+    table.sort(allChests)
+
+    if #allChests == 0 then
+        status("No chests on network!", 2)
+        return
+    end
+
+    -- Show the list with numbers, support scrolling if too many
+    local pickOffset = 0
+    local pickMax = math.max(0, #allChests - (h - 2))
+
+    local function drawPicker()
+        term.redirect(mainWin)
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.write("Select output chest (type number):")
+        for y = 2, h - 1 do
+            local idx = y - 1 + pickOffset
+            local name = allChests[idx]
+            term.setCursorPos(1, y)
+            if name then
+                local marker = (name == outputChestName) and "*" or " "
+                term.write(string.format("%s%2d. %s", marker, idx, name))
+            end
+        end
+        term.redirect(cmdWin)
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.write("Pick #: ")
+        term.redirect(term.native())
+    end
+
+    drawPicker()
+
+    local input = ""
+    while true do
+        local event, p1 = os.pullEvent()
+        if event == "mouse_scroll" then
+            pickOffset = math.max(0, math.min(pickOffset + p1, pickMax))
+            drawPicker()
+        elseif event == "char" then
+            input = input .. p1
+            term.redirect(cmdWin)
+            term.setCursorPos(1, 1)
+            term.clearLine()
+            term.write("Pick #: " .. input)
+            term.redirect(term.native())
+        elseif event == "key" then
+            if p1 == keys.enter then
+                local n = tonumber(input)
+                if n and allChests[n] then
+                    outputChestName = allChests[n]
+                    saveOutputName(outputChestName)
+                    rebuildChestList()
+                    scanChests()
+                    status("Output set: " .. outputChestName, 2)
+                    return
+                else
+                    status("Invalid number", 1)
+                    drawPicker()
+                    input = ""
+                end
+            elseif p1 == keys.backspace then
+                input = input:sub(1, -2)
+                term.redirect(cmdWin)
+                term.setCursorPos(1, 1)
+                term.clearLine()
+                term.write("Pick #: " .. input)
+                term.redirect(term.native())
+            elseif p1 == keys.q then
+                return
+            end
+        end
+    end
+end
+
+-- Just list networked chests for inspection
+local function listNetworkChests()
+    if not modem then
+        status("No wired modem found!", 2)
+        return
+    end
+
+    local allChests = {}
+    for _, name in ipairs(modem.getNamesRemote()) do
+        if peripheral.hasType(name, "inventory") then
+            table.insert(allChests, name)
+        end
+    end
+    table.sort(allChests)
+
+    term.redirect(mainWin)
+    term.clear()
     term.setCursorPos(1, 1)
-    term.write("Commands:")
-    term.setCursorPos(1, 2)
-    term.write("  q, quit - Exit program")
-    term.setCursorPos(1, 3)
-    term.write("  help - Show this help")
-    term.setCursorPos(1, 4)
-    term.write("  pull <item> <amount> - Pull items")
-    term.setCursorPos(1, 5)
-    term.write("  refresh - Rescan all chests")
-    term.setCursorPos(1, 6)
-    term.write("  sort name|count - Sort the list")
-    term.setCursorPos(1, 7)
-    term.write("  find <item> - Filter list by name")
-    term.setCursorPos(1, 8)
-    term.write("  list - Show full list")
-    term.setCursorPos(1, 9)
-    term.write("  how - Setup tutorial")
-    term.setCursorPos(1, 10)
-    term.write("")
-    term.setCursorPos(1, 11)
-    term.write("Press any key to return...")
+    term.write("Networked chests (* = output):")
+    for i, name in ipairs(allChests) do
+        if i + 1 > h - 2 then break end -- don't overflow
+        term.setCursorPos(1, i + 1)
+        local marker = (name == outputChestName) and "*" or " "
+        term.write(string.format("%s%2d. %s", marker, i, name))
+    end
+    term.setCursorPos(1, h - 1)
+    term.write("Press any key...")
     term.redirect(term.native())
     os.pullEvent("key")
 end
@@ -134,22 +280,12 @@ end
 local function pullItem(itemName, amount)
     local data = itemData[itemName]
     if not data then
-        term.redirect(cmdWin)
-        term.clear()
-        term.setCursorPos(1, 1)
-        term.write("Item not found!")
-        term.redirect(term.native())
-        sleep(1)
+        status("Item not found!")
         return
     end
-    
-    if not outputChest then
-        term.redirect(cmdWin)
-        term.clear()
-        term.setCursorPos(1, 1)
-        term.write("No output chest found!")
-        term.redirect(term.native())
-        sleep(1)
+
+    if not outputChestName or not outputChest then
+        status("No output set! Use 'output' command", 2)
         return
     end
 
@@ -157,55 +293,37 @@ local function pullItem(itemName, amount)
     for _, loc in ipairs(data.locations) do
         if remaining <= 0 then break end
         local toMove = math.min(remaining, loc.count)
-        loc.chest.pushItems(outputChestName, loc.slot, toMove)
-        remaining = remaining - toMove
+        local moved = loc.chest.pushItems(outputChestName, loc.slot, toMove)
+        remaining = remaining - moved
     end
-    
-    term.redirect(cmdWin)
-    term.clear()
-    term.setCursorPos(1, 1)
-    term.write("Pulled " .. (amount - remaining) .. "x " .. itemName)
-    term.redirect(term.native())
-    sleep(1)
+
+    status("Pulled " .. (amount - remaining) .. "x " .. itemName)
 end
 
 local function handleCommand(cmd)
     if cmd == "q" or cmd == "quit" then
         term.clear()
         term.setCursorPos(1, 1)
-        return false  -- exit
+        return false
     elseif cmd == "help" then
         showHelp()
-        return true
     elseif cmd == "refresh" then
+        rebuildChestList()
         scanChests()
-        term.redirect(cmdWin)
-        term.clear()
-        term.setCursorPos(1, 1)
-        term.write("Refreshed! " .. #itemList .. " items found")
-        term.redirect(term.native())
-        sleep(1)
-        return true
+        status("Refreshed! " .. #itemList .. " items found")
+    elseif cmd == "chests" then
+        listNetworkChests()
+    elseif cmd == "output" then
+        chooseOutputChest()
     elseif cmd:match("^sort ") then
         local mode = cmd:match("^sort (%S+)$")
         if mode == "name" or mode == "count" then
             sortMode = mode
             scanChests()
-            term.redirect(cmdWin)
-            term.clear()
-            term.setCursorPos(1, 1)
-            term.write("Sorted by " .. mode)
-            term.redirect(term.native())
-            sleep(1)
+            status("Sorted by " .. mode)
         else
-            term.redirect(cmdWin)
-            term.clear()
-            term.setCursorPos(1, 1)
-            term.write("Usage: sort name|count")
-            term.redirect(term.native())
-            sleep(1)
+            status("Usage: sort name|count")
         end
-        return true
     elseif cmd:match("^find ") then
         local query = cmd:match("^find (.+)$")
         if query then
@@ -217,97 +335,61 @@ local function handleCommand(cmd)
             end
             scrollOffset = 0
             maxScroll = math.max(0, #itemList - (h - 1))
-            term.redirect(cmdWin)
-            term.clear()
-            term.setCursorPos(1, 1)
-            term.write("Found " .. #itemList .. " matches")
-            term.redirect(term.native())
-            sleep(1)
+            status("Found " .. #itemList .. " matches")
         end
-        return true
     elseif cmd == "list" then
         scanChests()
-        return true
-    elseif cmd:match("^find ") then
-        local query = cmd:match("^find (.+)$")
-        if query then
-            itemList = {}
-            for name, count in pairs(itemCounts) do
-                if name:find(query, 1, true) then
-                    table.insert(itemList, string.format("%-4dx: %s", count, name))
-                end
-            end
-            scrollOffset = 0
-            maxScroll = math.max(0, #itemList - (h - 1))
-            term.redirect(cmdWin)
-            term.clear()
-            term.setCursorPos(1, 1)
-            term.write("Found " .. #itemList .. " matches")
-            term.redirect(term.native())
-            sleep(1)
-        end
-        return true
-    elseif cmd == "list" then
-        scanChests()
-        return true
     elseif cmd == "how" then
         term.redirect(mainWin)
         term.clear()
-        term.setCursorPos(1, 1)
-        term.write("=== SETUP TUTORIAL ===")
-        term.setCursorPos(1, 3)
-        term.write("1. Place a wired modem on this computer")
-        term.setCursorPos(1, 4)
-        term.write("2. Connect modems to each storage chest")
-        term.setCursorPos(1, 5)
-        term.write("3. Right-click each modem to activate it")
-        term.setCursorPos(1, 6)
-        term.write("4. All connected chests will be scanned")
-        term.setCursorPos(1, 7)
-        term.write("")
-        term.setCursorPos(1, 8)
-        term.write("Output chest:")
-        term.setCursorPos(1, 9)
-        term.write("  Place a chest directly ON TOP of")
-        term.setCursorPos(1, 10)
-        term.write("  the computer. Items from 'pull'")
-        term.setCursorPos(1, 11)
-        term.write("  will always be sent there.")
-        term.setCursorPos(1, 13)
-        term.write("Press any key to return...")
+        local lines = {
+            "=== SETUP TUTORIAL ===",
+            "",
+            "1. Place a wired modem on this computer",
+            "2. Connect modems to each storage chest",
+            "3. Right-click each modem to activate it",
+            "4. Place a modem on your OUTPUT chest too",
+            "5. Run 'output' to pick which chest is",
+            "   the output. It will be saved.",
+            "",
+            "Items pulled with 'pull' will be sent",
+            "to the chosen output chest.",
+            "",
+            "Press any key to return...",
+        }
+        for i, line in ipairs(lines) do
+            term.setCursorPos(1, i)
+            term.write(line)
+        end
         term.redirect(term.native())
         os.pullEvent("key")
-        return true
     elseif cmd:match("^pull ") then
         local itemName, amountStr = cmd:match("^pull (%S+) (%d+)$")
         if itemName and amountStr then
             pullItem(itemName, tonumber(amountStr))
         else
-            term.redirect(cmdWin)
-            term.clear()
-            term.setCursorPos(1, 1)
-            term.write("Usage: pull <item> <amount>")
-            term.redirect(term.native())
-            sleep(1)
+            status("Usage: pull <item> <amount>")
         end
-        return true
     end
-    return true  -- continue
+    return true
+end
+
+-- Prompt for output on first run if not set
+if not outputChestName then
+    status("No output chest configured. Use 'output' to set one.", 2)
 end
 
 draw()
 
 while true do
     local event, param1 = os.pullEvent()
-    
+
     if event == "mouse_scroll" then
         scrollOffset = math.max(0, math.min(scrollOffset + param1, maxScroll))
         draw()
-        
     elseif event == "char" then
         cmdInput = cmdInput .. param1
         draw()
-        
     elseif event == "key" then
         if param1 == keys.enter then
             if not handleCommand(cmdInput) then
