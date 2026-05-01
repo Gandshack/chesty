@@ -19,14 +19,16 @@ local itemCounts = {}
 local itemData = {}  -- stores {parsedName, fullName, chestIndex, slots}
 for chestIdx, chest in ipairs(chests) do
     local items = chest.list()
-    for slot, item in pairs(items) do
-        local parsedName = item.name:match(":(.+)$") or item.name
-        itemCounts[parsedName] = (itemCounts[parsedName] or 0) + item.count
-        
-        if not itemData[parsedName] then
-            itemData[parsedName] = {fullName = item.name, locations = {}}
+    if items then
+        for slot, item in pairs(items) do
+            local parsedName = item.name:match(":(.+)$") or item.name
+            itemCounts[parsedName] = (itemCounts[parsedName] or 0) + item.count
+            
+            if not itemData[parsedName] then
+                itemData[parsedName] = {fullName = item.name, locations = {}}
+            end
+            table.insert(itemData[parsedName].locations, {chest = chest, chestIdx = chestIdx, slot = slot, count = item.count})
         end
-        table.insert(itemData[parsedName].locations, {chest = chest, chestIdx = chestIdx, slot = slot, count = item.count})
     end
 end
 
