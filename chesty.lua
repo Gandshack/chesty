@@ -5,13 +5,12 @@ local mainWin = window.create(term.current(), 1, 1, w, h - 1)
 local cmdWin = window.create(term.current(), 1, h, w, 1)
 
 local outputChest = peripheral.wrap("top")
-local allChests = {peripheral.find("inventory")}
 local chests = {}
 
--- Exclude output chest from storage chests
-for _, chest in ipairs(allChests) do
-    if chest ~= outputChest then
-        table.insert(chests, chest)
+-- Find all inventory peripherals except "top"
+for _, name in ipairs(peripheral.getNames()) do
+    if peripheral.getType(name) == "inventory" and name ~= "top" then
+        table.insert(chests, peripheral.wrap(name))
     end
 end
 
