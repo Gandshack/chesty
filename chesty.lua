@@ -43,7 +43,13 @@ local function rebuildChestList()
 
     if not modem then return end
 
-    for _, name in ipairs(modem.getNamesRemote()) do
+    local names = modem.getNamesRemote()
+    table.sort(names, function(a, b)
+        local na = tonumber(a:match("(%d+)$")) or 0
+        local nb = tonumber(b:match("(%d+)$")) or 0
+        return na < nb
+    end)
+    for _, name in ipairs(names) do
         if peripheral.hasType(name, "inventory") then
             if name == outputChestName then
                 outputChest = peripheral.wrap(name)
