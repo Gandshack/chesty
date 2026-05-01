@@ -5,13 +5,20 @@ local mainWin = window.create(term.current(), 1, 1, w, h - 1)
 local cmdWin = window.create(term.current(), 1, h, w, 1)
 
 local chests = {peripheral.find("inventory")}
+local outputChest = peripheral.wrap("top")
 
 local itemCounts = {}
-for _, chest in ipairs(chests) do
+local itemData = {}  -- stores {parsedName, fullName, chestIndex, slots}
+for chestIdx, chest in ipairs(chests) do
     local items = chest.list()
     for slot, item in pairs(items) do
-        local name = item.name:match(":(.+)$") or item.name
-        itemCounts[name] = (itemCounts[name] or 0) + item.count
+        local parsedName = item.name:match(":(.+)$") or item.name
+        itemCounts[parsedName] = (itemCounts[parsedName] or 0) + item.count
+        
+        if not itemData[parsedName] then
+            itemData[parsedName] = {fullName = item.name, locations = {}}
+        end
+        table.insert(itemData[parsedName].locations, {chest = chest, chestIdx = chestIdx, slot = slot, count = item.count})
     end
 end
 
@@ -43,18 +50,83 @@ local function draw()
     term.redirect(term.native())
 end
 
+local function showHelp()
+    term.redirect(mainWin)
+    term.clear()
+    term.setCursorPos(1, 1)
+    term.write("Commands:")
+    term.setCursorPos(1, 2)
+    term.write("  q, quit - Exit program")
+    term.setCursorPos(1, 3)
+    term.write("  help - Show this help")
+    term.setCursorPos(1, 4)
+    term.write("  pull <item> <amount> - Pull items")
+    term.setCursorPos(1, 5)
+    term.write("")
+    term.setCursorPos(1, 6)
+    term.write("Press any key to return...")
+    term.redirect(term.native())
+    os.pullEvent("key")
+end
+
+local function pullItem(itemName, amount)
+    local data = itemData[itemName]
+    if not data then
+        term.redirect(cmdWin)
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.write("Item not found!")
+        term.redirect(term.native())
+        sleep(1)
+        return
+    end
+    
+    if not outputChest then
+        term.redirect(cmdWin)
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.write("No chest on top!")
+        term.redirect(term.native())
+        sleep(1)
+        return
+    end
+    
+    local remaining = amount
+    for _, loc in ipairs(data.locations) do
+        if remaining <= 0 then break end
+        local toMove = math.min(remaining, loc.count)
+        loc.chest.pushItems("top", loc.slot, toMove)
+        remaining = remaining - toMove
+    end
+    
+    term.redirect(cmdWin)
+    term.clear()
+    term.setCursorPos(1, 1)
+    term.write("Pulled " .. (amount - remaining) .. "x " .. itemName)
+    term.redirect(term.native())
+    sleep(1)
+end
+
 local function handleCommand(cmd)
     if cmd == "q" or cmd == "quit" then
         term.clear()
         term.setCursorPos(1, 1)
         return false  -- exit
     elseif cmd == "help" then
-        term.redirect(cmdWin)
-        term.clear()
-        term.setCursorPos(1, 1)
-        term.write("q=quit, help=this")
-        term.redirect(term.native())
-        sleep(2)
+        showHelp()
+        return true
+    elseif cmd:match("^pull ") then
+        local itemName, amountStr = cmd:match("^pull (%S+) (%d+)$")
+        if itemName and amountStr then
+            pullItem(itemName, tonumber(amountStr))
+        else
+            term.redirect(cmdWin)
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.write("Usage: pull <item> <amount>")
+            term.redirect(term.native())
+            sleep(1)
+        end
         return true
     end
     return true  -- continue
