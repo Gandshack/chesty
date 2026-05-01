@@ -133,11 +133,12 @@ local function pullItem(itemName, amount)
         return
     end
     
+    local outputName = peripheral.getName(currentOutput)
     local remaining = amount
     for _, loc in ipairs(data.locations) do
         if remaining <= 0 then break end
         local toMove = math.min(remaining, loc.count)
-        loc.chest.pushItems("top", loc.slot, toMove)
+        loc.chest.pushItems(outputName, loc.slot, toMove)
         remaining = remaining - toMove
     end
     
