@@ -97,8 +97,12 @@ local function showHelp()
     term.setCursorPos(1, 6)
     term.write("  sort name|count - Sort the list")
     term.setCursorPos(1, 7)
-    term.write("")
+    term.write("  find <item> - Filter list by name")
     term.setCursorPos(1, 8)
+    term.write("  list - Show full list")
+    term.setCursorPos(1, 9)
+    term.write("")
+    term.setCursorPos(1, 10)
     term.write("Press any key to return...")
     term.redirect(term.native())
     os.pullEvent("key")
@@ -178,6 +182,50 @@ local function handleCommand(cmd)
             term.redirect(term.native())
             sleep(1)
         end
+        return true
+    elseif cmd:match("^find ") then
+        local query = cmd:match("^find (.+)$")
+        if query then
+            itemList = {}
+            for name, count in pairs(itemCounts) do
+                if name:find(query, 1, true) then
+                    table.insert(itemList, string.format("%-4dx: %s", count, name))
+                end
+            end
+            scrollOffset = 0
+            maxScroll = math.max(0, #itemList - (h - 1))
+            term.redirect(cmdWin)
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.write("Found " .. #itemList .. " matches")
+            term.redirect(term.native())
+            sleep(1)
+        end
+        return true
+    elseif cmd == "list" then
+        scanChests()
+        return true
+    elseif cmd:match("^find ") then
+        local query = cmd:match("^find (.+)$")
+        if query then
+            itemList = {}
+            for name, count in pairs(itemCounts) do
+                if name:find(query, 1, true) then
+                    table.insert(itemList, string.format("%-4dx: %s", count, name))
+                end
+            end
+            scrollOffset = 0
+            maxScroll = math.max(0, #itemList - (h - 1))
+            term.redirect(cmdWin)
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.write("Found " .. #itemList .. " matches")
+            term.redirect(term.native())
+            sleep(1)
+        end
+        return true
+    elseif cmd == "list" then
+        scanChests()
         return true
     elseif cmd:match("^pull ") then
         local itemName, amountStr = cmd:match("^pull (%S+) (%d+)$")
