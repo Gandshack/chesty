@@ -1,12 +1,19 @@
 local w, h = term.getSize()
 
-local chest = peripheral.find("inventory")
-local items = chest.list()
+local chests = {peripheral.find("inventory")}
+
+local itemCounts = {}
+for _, chest in ipairs(chests) do
+    local items = chest.list()
+    for slot, item in pairs(items) do
+        local name = item.name:match(":(.+)$") or item.name
+        itemCounts[name] = (itemCounts[name] or 0) + item.count
+    end
+end
 
 local itemList = {}
-for slot, item in pairs(items) do
-    local name = item.name:match(":(.+)$") or item.name
-    table.insert(itemList, string.format("%-4dx: %s", item.count, name))
+for name, count in pairs(itemCounts) do
+    table.insert(itemList, string.format("%-4dx: %s", count, name))
 end
 
 local scrollOffset = 0
