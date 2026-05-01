@@ -94,7 +94,7 @@ local function scanChests()
     end
 
     for i, entry in ipairs(itemList) do
-        itemList[i] = string.format("%-4dx: %s", entry.count, entry.name)
+        itemList[i] = string.format("%-6dx: %s", entry.count, entry.name)
     end
 
     scrollOffset = 0
