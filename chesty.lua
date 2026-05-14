@@ -536,9 +536,14 @@ while true do
             if not lastKeyWasTab then
                 tabMatches = {}
                 tabPrefix = ""
-                local itemPrefix = cmdInput:match("^pull (.*)$")
-                if itemPrefix then
-                    tabPrefix = "pull "
+                local itemPrefix =
+                    cmdInput:match("^pull (.*)$") or
+                    cmdInput:match("^find (.*)$")
+                local cmd_prefix =
+                    cmdInput:match("^(pull )") or
+                    cmdInput:match("^(find )")
+                if itemPrefix and cmd_prefix then
+                    tabPrefix = cmd_prefix
                     for name in pairs(itemCounts) do
                         if name:sub(1, #itemPrefix) == itemPrefix then
                             table.insert(tabMatches, name)
