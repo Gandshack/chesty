@@ -428,9 +428,19 @@ local function handleCommand(cmd)
         local query = cmd:match("^find (.+)$")
         if query then
             itemList = {}
-            for name, count in pairs(itemCounts) do
-                if name:find(query, 1, true) then
-                    table.insert(itemList, string.format("%-4dx: %s", count, name))
+            if query:sub(1, 1) == "@" then
+                local modQuery = query:sub(2)
+                for name, count in pairs(itemCounts) do
+                    local mod = itemData[name].fullName:match("^(.-):")
+                    if mod and mod:find(modQuery, 1, true) then
+                        table.insert(itemList, string.format("%-4dx: %s", count, name))
+                    end
+                end
+            else
+                for name, count in pairs(itemCounts) do
+                    if name:find(query, 1, true) then
+                        table.insert(itemList, string.format("%-4dx: %s", count, name))
+                    end
                 end
             end
             scrollOffset = 0
