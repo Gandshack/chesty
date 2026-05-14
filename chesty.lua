@@ -421,7 +421,7 @@ local function pushAll()
         end
     end
 
-    scanChests()
+    scanChests("Pushing to chests...")
     status("Pushed " .. total .. " items to storage")
 end
 
