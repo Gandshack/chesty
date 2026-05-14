@@ -79,11 +79,11 @@ local scrollOffset = 0
 local maxScroll = 0
 local sortMode = "name"
 
-local function scanChests()
+local function scanChests(msg)
     term.redirect(cmdWin)
     term.clear()
     term.setCursorPos(1, 1)
-    term.write("chesty v" .. version .. " - Scanning chests...")
+    term.write("chesty v" .. version .. " - " .. (msg or "Scanning chests..."))
     term.redirect(term.native())
 
     itemCounts = {}
@@ -446,7 +446,7 @@ local function handleCommand(cmd)
         local mode = cmd:match("^sort (%S+)$")
         if mode == "name" or mode == "count" then
             sortMode = mode
-            scanChests()
+            scanChests("Sorting by " .. mode .. "...")
             status("Sorted by " .. mode)
         else
             status("Usage: sort name|count")
