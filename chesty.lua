@@ -502,6 +502,9 @@ local function handleCommand(cmd)
         os.pullEvent("key")
     elseif cmd:match("^pull ") then
         local itemName, amountStr = cmd:match("^pull (%S+) (%d+)$")
+        if not itemName then
+            amountStr, itemName = cmd:match("^pull (%d+) (%S+)$")
+        end
         if itemName and amountStr then
             pullItem(itemName, tonumber(amountStr))
         else
