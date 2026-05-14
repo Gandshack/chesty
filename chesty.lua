@@ -82,7 +82,14 @@ local function scanChests()
                 itemCounts[parsedName] = (itemCounts[parsedName] or 0) + item.count
 
                 if not itemData[parsedName] then
-                    itemData[parsedName] = {fullName = item.name, locations = {}}
+                    local detail = chest.getItemDetail(slot)
+                    local tags = {}
+                    if detail and detail.tags then
+                        for tag in pairs(detail.tags) do
+                            table.insert(tags, tag)
+                        end
+                    end
+                    itemData[parsedName] = {fullName = item.name, locations = {}, tags = tags}
                 end
                 table.insert(itemData[parsedName].locations, {chest = chest, chestIdx = chestIdx, slot = slot, count = item.count})
             end
@@ -109,6 +116,10 @@ end
 
 scanChests()
 local cmdInput = ""
+local tabMatches = {}
+local tabIndex = 0
+local tabPrefix = ""
+local lastKeyWasTab = false
 
 local function draw()
     term.redirect(mainWin)
@@ -436,6 +447,16 @@ local function handleCommand(cmd)
                         table.insert(itemList, string.format("%-4dx: %s", count, name))
                     end
                 end
+            elseif query:sub(1, 1) == "#" then
+                local tagQuery = query:sub(2)
+                for name, count in pairs(itemCounts) do
+                    for _, tag in ipairs(itemData[name].tags) do
+                        if tag:find(tagQuery, 1, true) then
+                            table.insert(itemList, string.format("%-4dx: %s", count, name))
+                            break
+                        end
+                    end
+                end
             else
                 for name, count in pairs(itemCounts) do
                     if name:find(query, 1, true) then
@@ -500,16 +521,41 @@ while true do
         scrollOffset = math.max(0, math.min(scrollOffset + param1, maxScroll))
         draw()
     elseif event == "char" then
+        lastKeyWasTab = false
         cmdInput = cmdInput .. param1
         draw()
     elseif event == "key" then
         if param1 == keys.enter then
+            lastKeyWasTab = false
             if not handleCommand(cmdInput) then
                 break
             end
             cmdInput = ""
             draw()
+        elseif param1 == keys.tab then
+            if not lastKeyWasTab then
+                tabMatches = {}
+                tabPrefix = ""
+                local itemPrefix = cmdInput:match("^pull (.*)$")
+                if itemPrefix then
+                    tabPrefix = "pull "
+                    for name in pairs(itemCounts) do
+                        if name:sub(1, #itemPrefix) == itemPrefix then
+                            table.insert(tabMatches, name)
+                        end
+                    end
+                    table.sort(tabMatches)
+                    tabIndex = 0
+                end
+            end
+            if #tabMatches > 0 then
+                tabIndex = (tabIndex % #tabMatches) + 1
+                cmdInput = tabPrefix .. tabMatches[tabIndex]
+            end
+            lastKeyWasTab = true
+            draw()
         elseif param1 == keys.backspace then
+            lastKeyWasTab = false
             cmdInput = cmdInput:sub(1, -2)
             draw()
         end
