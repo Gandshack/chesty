@@ -70,6 +70,12 @@ local maxScroll = 0
 local sortMode = "name"
 
 local function scanChests()
+    term.redirect(cmdWin)
+    term.clear()
+    term.setCursorPos(1, 1)
+    term.write("Scanning chests...")
+    term.redirect(term.native())
+
     itemCounts = {}
     itemData = {}
     itemList = {}
