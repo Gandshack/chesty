@@ -505,10 +505,16 @@ local function handleCommand(cmd)
         if not itemName then
             amountStr, itemName = cmd:match("^pull (%d+) (%S+)$")
         end
+        if not itemName then
+            itemName = cmd:match("^pull (%S+)$")
+            if itemName then
+                amountStr = tostring(itemCounts[itemName] or 0)
+            end
+        end
         if itemName and amountStr then
             pullItem(itemName, tonumber(amountStr))
         else
-            status("Usage: pull <item> <amount>")
+            status("Usage: pull <item> [amount]")
         end
     elseif cmd == "push" then
         pushAll()
@@ -545,12 +551,21 @@ while true do
             if not lastKeyWasTab then
                 tabMatches = {}
                 tabPrefix = ""
-                local itemPrefix =
-                    cmdInput:match("^pull (.*)$") or
-                    cmdInput:match("^find (.*)$")
-                local cmd_prefix =
-                    cmdInput:match("^(pull )") or
-                    cmdInput:match("^(find )")
+                local itemPrefix, cmd_prefix
+                -- "pull <num> <item>" form
+                local num, partial = cmdInput:match("^pull (%d+) (.*)$")
+                if num then
+                    itemPrefix = partial
+                    cmd_prefix = "pull " .. num .. " "
+                else
+                    -- "pull <item>" or "find <item>" form
+                    itemPrefix =
+                        cmdInput:match("^pull (.*)$") or
+                        cmdInput:match("^find (.*)$")
+                    cmd_prefix =
+                        cmdInput:match("^(pull )") or
+                        cmdInput:match("^(find )")
+                end
                 if itemPrefix and cmd_prefix then
                     tabPrefix = cmd_prefix
                     for name in pairs(itemCounts) do
