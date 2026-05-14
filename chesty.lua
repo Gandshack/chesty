@@ -1,5 +1,15 @@
 local w, h = term.getSize()
 
+-- Load version from pakpak.json sitting next to this script
+local version = "unknown"
+local meta_path = fs.combine(fs.getDir(shell.getRunningProgram()), "pakpak.json")
+if fs.exists(meta_path) then
+    local f = fs.open(meta_path, "r")
+    local meta = textutils.unserializeJSON(f.readAll())
+    f.close()
+    if meta and meta.version then version = meta.version end
+end
+
 -- Create windows
 local mainWin = window.create(term.current(), 1, 1, w, h - 1)
 local cmdWin = window.create(term.current(), 1, h, w, 1)
@@ -73,7 +83,7 @@ local function scanChests()
     term.redirect(cmdWin)
     term.clear()
     term.setCursorPos(1, 1)
-    term.write("Scanning chests...")
+    term.write("chesty v" .. version .. " - Scanning chests...")
     term.redirect(term.native())
 
     itemCounts = {}
